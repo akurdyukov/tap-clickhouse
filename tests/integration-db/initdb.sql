@@ -1,6 +1,6 @@
 CREATE TABLE simple_table (
     id INTEGER,
-    updated_at DATETIME,
+    updated_at DATE,
     name VARCHAR
 )
 ENGINE = MergeTree()

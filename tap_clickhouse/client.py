@@ -5,16 +5,108 @@ This includes ClickHouseStream and ClickHouseConnector.
 
 from __future__ import annotations
 
+import datetime
 from typing import Any, Iterable
 
 import sqlalchemy  # noqa: TCH002
 from singer_sdk import SQLConnector, SQLStream
 from sqlalchemy.engine import Engine, Inspector
+import singer_sdk.helpers._typing
 
+unpatched_conform = singer_sdk.helpers._typing._conform_primitive_property
+def patched_conform(
+    elem: Any,
+    property_schema: dict,
+) -> Any:
+    """Overrides Singer SDK type conformance to prevent dates turning into datetimes.
+    Converts a primitive (i.e. not object or array) to a json compatible type.
+    Returns:
+        The appropriate json compatible type.
+    """
+    if isinstance(elem, datetime.date):
+        return elem.isoformat()
+    return unpatched_conform(elem=elem, property_schema=property_schema)
 
+singer_sdk.helpers._typing._conform_primitive_property = patched_conform
 class ClickHouseConnector(SQLConnector):
     """Connects to the ClickHouse SQL source."""
 
+    def to_jsonschema_type_array(
+            from_type: str | sqlalchemy.types.TypeEngine | type[sqlalchemy.types.TypeEngine],
+    ) -> dict:
+        """Return the JSON Schema dict that describes the sql type.
+
+        Args:
+            from_type: The SQL type as a string or as a TypeEngine. If a TypeEngine is
+                provided, it may be provided as a class or a specific object instance.
+
+        Raises:
+            ValueError: If the `from_type` value is not of type `str` or `TypeEngine`.
+
+        Returns:
+            A compatible JSON Schema type definition.
+        """
+        sqltype_lookup: dict[str, dict] = {
+            # NOTE: This is an ordered mapping, with earlier mappings taking precedence.
+            #       If the SQL-provided type contains the type name on the left, the mapping
+            #       will return the respective singer type.
+            "timestamp": DateTimeType,
+            "datetime": DateTimeType,
+            "date": DateType,
+            "int": IntegerType,
+            "number": NumberType,
+            "decimal": NumberType,
+            "double": NumberType,
+            "float": NumberType,
+            "string": StringType,
+            "text": StringType,
+            "char": StringType,
+            "bool": BooleanType,
+            "variant": StringType,
+        }
+        import clickhouse_sqlalchemy
+        if isinstance(from_type, clickhouse_sqlalchemy.types.common.Array):
+            sqltype_lookup["array"] = ArrayType(to_jsonschema_type(from_type.item_type_impl))
+        if isinstance(from_type, str):
+            type_name = from_type
+        elif isinstance(from_type, sqlalchemy.types.TypeEngine):
+            type_name = type(from_type).__name__
+        elif isinstance(from_type, type) and issubclass(
+                from_type,
+                sqlalchemy.types.TypeEngine,
+        ):
+            type_name = from_type.__name__
+        else:
+            msg = "Expected `str` or a SQLAlchemy `TypeEngine` object or type."
+            raise ValueError(msg)
+
+        # Look for the type name within the known SQL type names:
+        for sqltype, jsonschema_type in sqltype_lookup.items():
+            if sqltype.lower() in type_name.lower():
+                return jsonschema_type
+
+        return sqltype_lookup["string"]  # safe failover to str
+
+    def to_jsonschema_type(
+        sql_type: (
+            str  # noqa: ANN401
+            | sqlalchemy.types.TypeEngine
+            | type[sqlalchemy.types.TypeEngine]
+            | t.Any
+        ),
+    ) -> dict:
+        if isinstance(sql_type, (str, sqlalchemy.types.TypeEngine)):
+            return self.to_jsonschema_type_array(sql_type).type_dict
+
+        if isinstance(sql_type, type):
+            if issubclass(sql_type, sqlalchemy.types.TypeEngine):
+                return self.to_jsonschema_type_array(sql_type).type_dict
+
+            msg = f"Unexpected type received: '{sql_type.__name__}'"
+            raise ValueError(msg)
+
+        msg = f"Unexpected type received: '{type(sql_type).__name__}'"
+        raise ValueError(msg)
     def get_sqlalchemy_url(self, config: dict) -> str:
         """Concatenate a SQLAlchemy URL for use in connecting to the source.
 

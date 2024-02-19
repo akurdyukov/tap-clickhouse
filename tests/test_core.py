@@ -4,6 +4,7 @@ import json
 
 import pytest
 import sqlalchemy
+from clickhouse_sqlalchemy.types import Array
 from faker import Faker
 from singer_sdk.testing.templates import TapTestTemplate
 from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table
@@ -38,6 +39,7 @@ def setup_test_table(table_name, sqlalchemy_url):
         table_name,
         metadata_obj,
         Column("id", Integer, primary_key=True),
+        Column("ARRAY_COL", Array(Integer), primary_key=False, nullable=True),
         Column("updated_at", DateTime(), nullable=False),
         Column("name", String()),
         engines.MergeTree(order_by="id", primary_key=["id"])
@@ -47,7 +49,7 @@ def setup_test_table(table_name, sqlalchemy_url):
         conn.execute(f"TRUNCATE TABLE {table_name}")
         for _ in range(1000):
             insert = test_replication_key_table.insert().values(
-                updated_at=fake.date_between(date1, date2), name=fake.name()
+                ARRAY_COL=[1], updated_at=fake.date_between(date1, date2), name=fake.name()
             )
             conn.execute(insert)
 
