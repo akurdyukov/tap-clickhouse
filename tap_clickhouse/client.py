@@ -12,6 +12,8 @@ import sqlalchemy  # noqa: TCH002
 from singer_sdk import SQLConnector, SQLStream
 from sqlalchemy.engine import Engine, Inspector
 import singer_sdk.helpers._typing
+import singer_sdk.typing as th
+
 
 unpatched_conform = singer_sdk.helpers._typing._conform_primitive_property
 def patched_conform(
@@ -27,11 +29,8 @@ def patched_conform(
         return elem.isoformat()
     return unpatched_conform(elem=elem, property_schema=property_schema)
 
-singer_sdk.helpers._typing._conform_primitive_property = patched_conform
-class ClickHouseConnector(SQLConnector):
-    """Connects to the ClickHouse SQL source."""
 
-    def to_jsonschema_type_array(
+def to_jsonschema_type_array(
             from_type: str | sqlalchemy.types.TypeEngine | type[sqlalchemy.types.TypeEngine],
     ) -> dict:
         """Return the JSON Schema dict that describes the sql type.
@@ -50,23 +49,23 @@ class ClickHouseConnector(SQLConnector):
             # NOTE: This is an ordered mapping, with earlier mappings taking precedence.
             #       If the SQL-provided type contains the type name on the left, the mapping
             #       will return the respective singer type.
-            "timestamp": DateTimeType,
-            "datetime": DateTimeType,
-            "date": DateType,
-            "int": IntegerType,
-            "number": NumberType,
-            "decimal": NumberType,
-            "double": NumberType,
-            "float": NumberType,
-            "string": StringType,
-            "text": StringType,
-            "char": StringType,
-            "bool": BooleanType,
-            "variant": StringType,
+            "timestamp": th.DateTimeType,
+            "datetime": th.DateTimeType,
+            "date": th.DateType,
+            "int": th.IntegerType,
+            "number": th.NumberType,
+            "decimal": th.NumberType,
+            "double": th.NumberType,
+            "float": th.NumberType,
+            "string": th.StringType,
+            "text": th.StringType,
+            "char": th.StringType,
+            "bool": th.BooleanType,
+            "variant": th.StringType,
         }
         import clickhouse_sqlalchemy
         if isinstance(from_type, clickhouse_sqlalchemy.types.common.Array):
-            sqltype_lookup["array"] = ArrayType(to_jsonschema_type(from_type.item_type_impl))
+            sqltype_lookup["array"] = th.ArrayType(to_jsonschema_type_array(from_type.item_type_impl))
         if isinstance(from_type, str):
             type_name = from_type
         elif isinstance(from_type, sqlalchemy.types.TypeEngine):
@@ -87,6 +86,15 @@ class ClickHouseConnector(SQLConnector):
 
         return sqltype_lookup["string"]  # safe failover to str
 
+
+
+singer_sdk.helpers._typing._conform_primitive_property = patched_conform
+class ClickHouseConnector(SQLConnector):
+    """Connects to the ClickHouse SQL source."""
+
+    
+    
+    @staticmethod
     def to_jsonschema_type(
         sql_type: (
             str  # noqa: ANN401
@@ -96,11 +104,11 @@ class ClickHouseConnector(SQLConnector):
         ),
     ) -> dict:
         if isinstance(sql_type, (str, sqlalchemy.types.TypeEngine)):
-            return self.to_jsonschema_type_array(sql_type).type_dict
+            return to_jsonschema_type_array(sql_type).type_dict
 
         if isinstance(sql_type, type):
             if issubclass(sql_type, sqlalchemy.types.TypeEngine):
-                return self.to_jsonschema_type_array(sql_type).type_dict
+                return to_jsonschema_type_array(sql_type).type_dict
 
             msg = f"Unexpected type received: '{sql_type.__name__}'"
             raise ValueError(msg)
@@ -139,28 +147,6 @@ class ClickHouseConnector(SQLConnector):
             self.sqlalchemy_url,
             echo=False,
         )
-
-    @staticmethod
-    def to_jsonschema_type(
-        from_type: str
-        | sqlalchemy.types.TypeEngine
-        | type[sqlalchemy.types.TypeEngine],
-    ) -> dict:
-        """Returns a JSON Schema equivalent for the given SQL type.
-
-        Developers may optionally add custom logic before calling the default
-        implementation inherited from the base class.
-
-        Args:
-            from_type: The SQL type as a string or as a TypeEngine. If a TypeEngine is
-                provided, it may be provided as a class or a specific object instance.
-
-        Returns:
-            A compatible JSON Schema type definition.
-        """
-        # Optionally, add custom logic before calling the parent SQLConnector method.
-        # You may delete this method if overrides are not needed.
-        return SQLConnector.to_jsonschema_type(from_type)
 
     def get_schema_names(self, engine: Engine, inspected: Inspector) -> list[str]:
         schemas = super().get_schema_names(engine, inspected)
