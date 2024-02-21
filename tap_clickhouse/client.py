@@ -184,20 +184,30 @@ class ClickHouseStream(SQLStream):
 
     connector_class = ClickHouseConnector
 
-    def get_records(self, partition: dict | None) -> Iterable[dict[str, Any]]:
-        """Return a generator of record-type dictionary objects.
+    def post_process(
+        self,
+        row: dict,
+        context: dict | None = None,  # noqa: ARG002
+    ) -> dict | None:
+        """As needed, append or transform raw data to match expected structure.
 
-        Developers may optionally add custom logic before calling the default
-        implementation inherited from the base class.
+        Optional. This method gives developers an opportunity to "clean up" the results
+        prior to returning records to the downstream tap - for instance: cleaning,
+        renaming, or appending properties to the raw record result returned from the
+        API.
+
+        Developers may also return `None` from this method to filter out
+        invalid or not-applicable records from the stream.
 
         Args:
-            partition: If provided, will read specifically from this data slice.
+            row: Individual record in the stream.
+            context: Stream partition or context dictionary.
 
-        Yields:
-            One dict per record.
+        Returns:
+            The resulting record dict, or `None` if the record should be excluded.
         """
-        # Optionally, add custom logic instead of calling the super().
-        # This is helpful if the source database provides batch-optimized record
-        # retrieval.
-        # If no overrides or optimizations are needed, you may delete this method.
-        yield from super().get_records(partition)
+        for key, value in row.items():
+            if type(value) == str:
+                if value.startswith("["):
+                    row[key] = eval(value)  
+        return row
