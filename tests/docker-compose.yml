@@ -8,10 +8,6 @@ services:
       CLICKHOUSE_USER: test_user
       CLICKHOUSE_PASSWORD: default
       CLICKHOUSE_DB: default
-    volumes:
-      - type: bind
-        source: ./integration-db
-        target: /docker-entrypoint-initdb.d
     ports:
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:8123:8123"
