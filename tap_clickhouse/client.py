@@ -5,16 +5,116 @@ This includes ClickHouseStream and ClickHouseConnector.
 
 from __future__ import annotations
 
+import datetime
 from typing import Any, Iterable
 
 import sqlalchemy  # noqa: TCH002
 from singer_sdk import SQLConnector, SQLStream
 from sqlalchemy.engine import Engine, Inspector
+import singer_sdk.helpers._typing
+import singer_sdk.typing as th
 
 
+unpatched_conform = singer_sdk.helpers._typing._conform_primitive_property
+def patched_conform(
+    elem: Any,
+    property_schema: dict,
+) -> Any:
+    """Overrides Singer SDK type conformance to prevent dates turning into datetimes.
+    Converts a primitive (i.e. not object or array) to a json compatible type.
+    Returns:
+        The appropriate json compatible type.
+    """
+    if isinstance(elem, datetime.date):
+        return elem.isoformat()
+    return unpatched_conform(elem=elem, property_schema=property_schema)
+
+
+def to_jsonschema_type_array(
+            from_type: str | sqlalchemy.types.TypeEngine | type[sqlalchemy.types.TypeEngine],
+    ) -> dict:
+        """Return the JSON Schema dict that describes the sql type.
+
+        Args:
+            from_type: The SQL type as a string or as a TypeEngine. If a TypeEngine is
+                provided, it may be provided as a class or a specific object instance.
+
+        Raises:
+            ValueError: If the `from_type` value is not of type `str` or `TypeEngine`.
+
+        Returns:
+            A compatible JSON Schema type definition.
+        """
+        sqltype_lookup: dict[str, dict] = {
+            # NOTE: This is an ordered mapping, with earlier mappings taking precedence.
+            #       If the SQL-provided type contains the type name on the left, the mapping
+            #       will return the respective singer type.
+            "timestamp": th.DateTimeType,
+            "datetime": th.DateTimeType,
+            "date": th.DateType,
+            "int": th.IntegerType,
+            "number": th.NumberType,
+            "decimal": th.NumberType,
+            "double": th.NumberType,
+            "float": th.NumberType,
+            "string": th.StringType,
+            "text": th.StringType,
+            "char": th.StringType,
+            "bool": th.BooleanType,
+            "variant": th.StringType,
+        }
+        import clickhouse_sqlalchemy
+        if isinstance(from_type, clickhouse_sqlalchemy.types.common.Array):
+            sqltype_lookup["array"] = th.ArrayType(to_jsonschema_type_array(from_type.item_type_impl))
+        if isinstance(from_type, str):
+            type_name = from_type
+        elif isinstance(from_type, sqlalchemy.types.TypeEngine):
+            type_name = type(from_type).__name__
+        elif isinstance(from_type, type) and issubclass(
+                from_type,
+                sqlalchemy.types.TypeEngine,
+        ):
+            type_name = from_type.__name__
+        else:
+            msg = "Expected `str` or a SQLAlchemy `TypeEngine` object or type."
+            raise ValueError(msg)
+
+        # Look for the type name within the known SQL type names:
+        for sqltype, jsonschema_type in sqltype_lookup.items():
+            if sqltype.lower() in type_name.lower():
+                return jsonschema_type
+
+        return sqltype_lookup["string"]  # safe failover to str
+
+
+
+singer_sdk.helpers._typing._conform_primitive_property = patched_conform
 class ClickHouseConnector(SQLConnector):
     """Connects to the ClickHouse SQL source."""
 
+    
+    
+    @staticmethod
+    def to_jsonschema_type(
+        sql_type: (
+            str  # noqa: ANN401
+            | sqlalchemy.types.TypeEngine
+            | type[sqlalchemy.types.TypeEngine]
+            | t.Any
+        ),
+    ) -> dict:
+        if isinstance(sql_type, (str, sqlalchemy.types.TypeEngine)):
+            return to_jsonschema_type_array(sql_type).type_dict
+
+        if isinstance(sql_type, type):
+            if issubclass(sql_type, sqlalchemy.types.TypeEngine):
+                return to_jsonschema_type_array(sql_type).type_dict
+
+            msg = f"Unexpected type received: '{sql_type.__name__}'"
+            raise ValueError(msg)
+
+        msg = f"Unexpected type received: '{type(sql_type).__name__}'"
+        raise ValueError(msg)
     def get_sqlalchemy_url(self, config: dict) -> str:
         """Concatenate a SQLAlchemy URL for use in connecting to the source.
 
@@ -47,28 +147,6 @@ class ClickHouseConnector(SQLConnector):
             self.sqlalchemy_url,
             echo=False,
         )
-
-    @staticmethod
-    def to_jsonschema_type(
-        from_type: str
-        | sqlalchemy.types.TypeEngine
-        | type[sqlalchemy.types.TypeEngine],
-    ) -> dict:
-        """Returns a JSON Schema equivalent for the given SQL type.
-
-        Developers may optionally add custom logic before calling the default
-        implementation inherited from the base class.
-
-        Args:
-            from_type: The SQL type as a string or as a TypeEngine. If a TypeEngine is
-                provided, it may be provided as a class or a specific object instance.
-
-        Returns:
-            A compatible JSON Schema type definition.
-        """
-        # Optionally, add custom logic before calling the parent SQLConnector method.
-        # You may delete this method if overrides are not needed.
-        return SQLConnector.to_jsonschema_type(from_type)
 
     def get_schema_names(self, engine: Engine, inspected: Inspector) -> list[str]:
         schemas = super().get_schema_names(engine, inspected)
@@ -106,20 +184,30 @@ class ClickHouseStream(SQLStream):
 
     connector_class = ClickHouseConnector
 
-    def get_records(self, partition: dict | None) -> Iterable[dict[str, Any]]:
-        """Return a generator of record-type dictionary objects.
+    def post_process(
+        self,
+        row: dict,
+        context: dict | None = None,  # noqa: ARG002
+    ) -> dict | None:
+        """As needed, append or transform raw data to match expected structure.
 
-        Developers may optionally add custom logic before calling the default
-        implementation inherited from the base class.
+        Optional. This method gives developers an opportunity to "clean up" the results
+        prior to returning records to the downstream tap - for instance: cleaning,
+        renaming, or appending properties to the raw record result returned from the
+        API.
+
+        Developers may also return `None` from this method to filter out
+        invalid or not-applicable records from the stream.
 
         Args:
-            partition: If provided, will read specifically from this data slice.
+            row: Individual record in the stream.
+            context: Stream partition or context dictionary.
 
-        Yields:
-            One dict per record.
+        Returns:
+            The resulting record dict, or `None` if the record should be excluded.
         """
-        # Optionally, add custom logic instead of calling the super().
-        # This is helpful if the source database provides batch-optimized record
-        # retrieval.
-        # If no overrides or optimizations are needed, you may delete this method.
-        yield from super().get_records(partition)
+        for key, value in row.items():
+            if type(value) == str:
+                if value.startswith("["):
+                    row[key] = eval(value)  
+        return row
