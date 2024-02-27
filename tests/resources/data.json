@@ -38,6 +38,12 @@
               "null"
             ]
           },
+          "NULLABLE_COL_INT": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "UUID_COL": {
             "type": [
               "string"
