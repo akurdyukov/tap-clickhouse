@@ -64,6 +64,8 @@ def to_jsonschema_type_array(
             "variant": th.StringType,
         }
         import clickhouse_sqlalchemy
+        if isinstance(from_type, clickhouse_sqlalchemy.types.common.Nullable):
+            from_type = from_type.nested_type
         if isinstance(from_type, clickhouse_sqlalchemy.types.common.Array):
             sqltype_lookup["array"] = th.ArrayType(to_jsonschema_type_array(from_type.item_type_impl))
         if isinstance(from_type, str):
