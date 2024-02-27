@@ -2,6 +2,7 @@
 import datetime
 import enum
 import json
+import os
 
 from faker import Faker
 import pytest
@@ -65,11 +66,32 @@ def teardown_test_table(table: DeclarativeMeta, sqlalchemy_url):
     engine = sqlalchemy.create_engine(sqlalchemy_url)
     table.__table__.drop(engine)
 
+class TapDiscoveryExactTest(TapTestTemplate):
+    """Test that discovery mode generates a valid tap catalog."""
+
+    name = "discovery_against_file"
+
+    def test(self) -> None:
+        # not loading catalog from file, trying to real discover
+        tap = TapClickHouse(config=SAMPLE_CONFIG)
+        tap.run_discovery()
+        tap_catalog = json.loads(tap.catalog_json_text)
+        test_file_path = os.path.abspath(os.path.join(os.path.join(os.path.join(__file__, os.pardir), "resources"), f"expected_catalog.json"))
+        with open(test_file_path, "r") as fd:
+            test_dict = json.loads(fd.read())
         
+        assert json.dumps(test_dict) == json.dumps(tap_catalog)
+
+custom_test_key_properties = suites.TestSuite(
+    kind="tap",
+    tests=[TapDiscoveryExactTest]
+)
+
 # Run standard built-in tap tests from the SDK:
 TapClickHouseTest = get_tap_test_class(
     tap_class=TapClickHouse,
     config=SAMPLE_CONFIG,
+    custom_suites=[custom_test_key_properties],
  	catalog="tests/resources/data.json",
 )
 class MyEnum(enum.Enum):
@@ -87,6 +109,7 @@ class TestTapClickHouse(TapClickHouseTest):
         BOOLEAN_COL = Column(Boolean)
         ARRAY_COL = Column(Array(String))
         NULLABLE_COL = Column(Nullable(String))
+        NULLABLE_COL_INT = Column(Nullable(Int8))
         UUID_COL = Column(UUID)
         LOW_CARDINALITY_STRING_COL = Column(LowCardinality(String))
         INT8_COL = Column(Int8)
@@ -127,6 +150,7 @@ class TestTapClickHouse(TapClickHouseTest):
                 "BOOLEAN_COL": 1 ,
                 "ARRAY_COL": str(["patata", "cebolla"]) ,
                 "NULLABLE_COL": None,
+                "NULLABLE_COL_INT": 3,
                 "UUID_COL": "61f0c404-5cb3-11e7-907b-a6006ad3dba0",
                 "LOW_CARDINALITY_STRING_COL": "lechuga",
                 "INT8_COL": x,
@@ -157,3 +181,5 @@ class TestTapClickHouse(TapClickHouseTest):
         setup_insert_table(self.ArrayTable, sqlalchemy_url, testing_rows)
         yield
         #teardown_test_table(self.ArrayTable, sqlalchemy_url)   
+
+
