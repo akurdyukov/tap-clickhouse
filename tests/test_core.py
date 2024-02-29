@@ -30,6 +30,9 @@ SAMPLE_CONFIG = {
     "verify": False,
     "sqlalchemy_url": "clickhouse+http://test_user:default@localhost:8123/default"
 }
+
+TABLE_NAME_SELECTED_COLUMNS_ONLY = "default-test_array_col"
+
 sqlalchemy_url="clickhouse+http://test_user:default@localhost:8123/default"
 
 
@@ -82,9 +85,39 @@ class TapDiscoveryExactTest(TapTestTemplate):
         
         assert json.dumps(test_dict) == json.dumps(tap_catalog)
 
+
+class TapTestSelectedColumnsOnly(TapTestTemplate):
+    name = "selected_columns_only"
+    table_name = TABLE_NAME_SELECTED_COLUMNS_ONLY    
+    
+    def test(self):
+        column_to_exclude = "FLOAT_COL"
+        self.tap.run_discovery()
+        tap_catalog = json.loads(self.tap.catalog_json_text)
+        for stream in tap_catalog["streams"]:
+            if stream.get("stream") and self.table_name not in stream["stream"]:
+                for metadata in stream["metadata"]:
+                    metadata["metadata"]["selected"] = False
+            else:
+                for metadata in stream["metadata"]:
+                    metadata["metadata"]["selected"] = True
+                    if (
+                        metadata["breadcrumb"] != []
+                        and metadata["breadcrumb"][1] == column_to_exclude
+                    ):
+                        metadata["metadata"]["selected"] = False
+
+        tap = TapClickHouse(config=SAMPLE_CONFIG, catalog=tap_catalog)
+        streams = tap.discover_streams()
+        selected_stream = next(s for s in streams if s.selected is True)
+
+        for row in selected_stream.get_records(context=None):
+            assert column_to_exclude not in row
+
+
 custom_test_key_properties = suites.TestSuite(
     kind="tap",
-    tests=[TapDiscoveryExactTest]
+    tests=[TapDiscoveryExactTest, TapTestSelectedColumnsOnly]
 )
 
 # Run standard built-in tap tests from the SDK:
@@ -180,6 +213,6 @@ class TestTapClickHouse(TapClickHouseTest):
         ]
         setup_insert_table(self.ArrayTable, sqlalchemy_url, testing_rows)
         yield
-        #teardown_test_table(self.ArrayTable, sqlalchemy_url)   
+        teardown_test_table(self.ArrayTable, sqlalchemy_url)   
 
 

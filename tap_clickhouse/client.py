@@ -13,6 +13,9 @@ from singer_sdk import SQLConnector, SQLStream
 from sqlalchemy.engine import Engine, Inspector
 import singer_sdk.helpers._typing
 import singer_sdk.typing as th
+import singer_sdk._singerlib as singer
+from singer_sdk.mapper import RemoveRecordTransform
+import typing as t
 
 
 unpatched_conform = singer_sdk.helpers._typing._conform_primitive_property
@@ -185,6 +188,32 @@ class ClickHouseStream(SQLStream):
     """Stream class for ClickHouse streams."""
 
     connector_class = ClickHouseConnector
+    excluded_columns = []
+    
+    def _generate_schema_messages(
+        self,
+    ) -> th.Generator[singer.SchemaMessage, None, None]:
+        """Generate schema messages from stream maps.
+
+        Yields:
+            Schema message objects.
+        """
+        bookmark_keys = [self.replication_key] if self.replication_key else None
+        for stream_map in self.stream_maps:
+            if isinstance(stream_map, RemoveRecordTransform):
+                # Don't emit schema if the stream's records are all ignored.
+                continue
+
+            for key, value in self.mask.items():
+                if not value:
+                    if len(key)>1 and key[1] in stream_map.transformed_schema['required']:  stream_map.transformed_schema['required'].remove(key[1])
+            
+            yield singer.SchemaMessage(
+                stream_map.stream_alias,
+                stream_map.transformed_schema,
+                stream_map.transformed_key_properties,
+                bookmark_keys,
+            )
 
     def post_process(
         self,
@@ -208,6 +237,7 @@ class ClickHouseStream(SQLStream):
         Returns:
             The resulting record dict, or `None` if the record should be excluded.
         """
+
         for key, value in row.items():
             if type(value) == str:
                 if value.startswith("["):
