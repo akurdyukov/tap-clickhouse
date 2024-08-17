@@ -6,7 +6,7 @@ import pytest
 import sqlalchemy
 from faker import Faker
 from singer_sdk.testing.templates import TapTestTemplate
-from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table
+from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, text
 from singer_sdk.testing import get_tap_test_class, suites
 from clickhouse_sqlalchemy import engines
 
@@ -44,7 +44,7 @@ def setup_test_table(table_name, sqlalchemy_url):
     )
     with engine.connect() as conn:
         metadata_obj.create_all(conn)
-        conn.execute(f"TRUNCATE TABLE {table_name}")
+        conn.execute(text(f"TRUNCATE TABLE {table_name}"))
         for _ in range(1000):
             insert = test_replication_key_table.insert().values(
                 updated_at=fake.date_between(date1, date2), name=fake.name()
@@ -55,7 +55,7 @@ def setup_test_table(table_name, sqlalchemy_url):
 def teardown_test_table(table_name, sqlalchemy_url):
     engine = sqlalchemy.create_engine(sqlalchemy_url)
     with engine.connect() as conn:
-        conn.execute(f"DROP TABLE {table_name}")
+        conn.execute(text(f"DROP TABLE {table_name}"))
 
 
 def key_properties_test():
