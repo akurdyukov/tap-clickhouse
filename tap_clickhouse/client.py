@@ -49,28 +49,6 @@ class ClickHouseConnector(SQLConnector):
             echo=False,
         )
 
-    @staticmethod
-    def to_jsonschema_type(
-        from_type: str
-        | sqlalchemy.types.TypeEngine
-        | type[sqlalchemy.types.TypeEngine],
-    ) -> dict:
-        """Returns a JSON Schema equivalent for the given SQL type.
-
-        Developers may optionally add custom logic before calling the default
-        implementation inherited from the base class.
-
-        Args:
-            from_type: The SQL type as a string or as a TypeEngine. If a TypeEngine is
-                provided, it may be provided as a class or a specific object instance.
-
-        Returns:
-            A compatible JSON Schema type definition.
-        """
-        # Optionally, add custom logic before calling the parent SQLConnector method.
-        # You may delete this method if overrides are not needed.
-        return SQLConnector.to_jsonschema_type(from_type)
-
     def get_schema_names(self, engine: Engine, inspected: Inspector) -> list[str]:
         schemas = super().get_schema_names(engine, inspected)
 
