@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "akurdyukov-tap-clickhouse"
-version = "0.0.2"
+version = "0.0.3"
 description = "`tap-clickhouse` is a Singer tap for ClickHouse, built with the Meltano Singer SDK."
 readme = "README.md"
 authors = ["Alik Kurdyukov <alik@kurdyukov.com>"]
