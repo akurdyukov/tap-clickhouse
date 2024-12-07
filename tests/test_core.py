@@ -89,7 +89,7 @@ TapClickHouseTest = get_tap_test_class(
 )
 
 
-class TestTapClockHouse(TapClickHouseTest):
+class TestTapClickHouse(TapClickHouseTest):
     table_name = TABLE_NAME
     sqlalchemy_url = SAMPLE_CONFIG["sqlalchemy_url"]
 
