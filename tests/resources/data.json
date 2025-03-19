@@ -1,26 +1,173 @@
 {
   "streams": [
     {
-      "tap_stream_id": "default-test_table",
-      "table_name": "test_table",
+      "tap_stream_id": "default-test_array_col",
+      "table_name": "test_array_col",
       "replication_method": "",
       "key_properties": [
-        "id"
+        "INT_COL"
       ],
       "schema": {
         "properties": {
-          "id": {
+          "INT_COL": {
             "type": [
               "integer"
             ]
           },
-          "updated_at": {
+          "FLOAT_COL": {
+            "type": [
+              "number"
+            ]
+          },
+          "BOOLEAN_COL": {
+            "type": [
+              "boolean"
+            ]
+          },
+          "ARRAY_COL": {
+            "items": {
+              "type": [
+                "string"
+              ]
+            },
+            "type": "array"
+          },
+          "NULLABLE_COL": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "NULLABLE_COL_INT": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "UUID_COL": {
+            "type": [
+              "string"
+            ]
+          },
+          "LOW_CARDINALITY_STRING_COL": {
+            "type": [
+              "string"
+            ]
+          },
+          "INT8_COL": {
+            "type": [
+              "integer"
+            ]
+          },
+          "UINT8_COL": {
+            "type": [
+              "integer"
+            ]
+          },
+          "INT16_COL": {
+            "type": [
+              "integer"
+            ]
+          },
+          "UINT16_COL": {
+            "type": [
+              "integer"
+            ]
+          },
+          "INT32_COL": {
+            "type": [
+              "integer"
+            ]
+          },
+          "UINT32_COL": {
+            "type": [
+              "integer"
+            ]
+          },
+          "INT64_COL": {
+            "type": [
+              "integer"
+            ]
+          },
+          "UINT64_COL": {
+            "type": [
+              "integer"
+            ]
+          },
+          "INT128_COL": {
+            "type": [
+              "integer"
+            ]
+          },
+          "UINT128_COL": {
+            "type": [
+              "integer"
+            ]
+          },
+          "INT256_COL": {
+            "type": [
+              "integer"
+            ]
+          },
+          "UINT256_COL": {
+            "type": [
+              "integer"
+            ]
+          },
+          "FLOAT32_COL": {
+            "type": [
+              "number"
+            ]
+          },
+          "FLOAT64_COL": {
+            "type": [
+              "number"
+            ]
+          },
+          "DATE_COL": {
+            "format": "date",
+            "type": [
+              "string"
+            ]
+          },
+          "DATETIME_COL": {
             "format": "date-time",
             "type": [
               "string"
             ]
           },
-          "name": {
+          "DATETIME64_COL": {
+            "format": "date-time",
+            "type": [
+              "string"
+            ]
+          },
+          "ENUM_COL": {
+            "type": [
+              "string"
+            ]
+          },
+          "ENUM8_COL": {
+            "type": [
+              "string"
+            ]
+          },
+          "ENUM16_COL": {
+            "type": [
+              "string"
+            ]
+          },
+          "DECIMAL_COL": {
+            "type": [
+              "number"
+            ]
+          },
+          "TUPLE_COL": {
+            "type": [
+              "string"
+            ]
+          },
+          "MAP_COL": {
             "type": [
               "string"
             ]
@@ -28,18 +175,53 @@
         },
         "type": "object",
         "required": [
-          "id",
-          "updated_at",
-          "name"
+          "INT_COL",
+          "FLOAT_COL",
+          "BOOLEAN_COL",
+          "ARRAY_COL",
+          "UUID_COL",
+          "LOW_CARDINALITY_STRING_COL",
+          "INT8_COL",
+          "UINT8_COL",
+          "INT16_COL",
+          "UINT16_COL",
+          "INT32_COL",
+          "UINT32_COL",
+          "INT64_COL",
+          "UINT64_COL",
+          "INT128_COL",
+          "UINT128_COL",
+          "INT256_COL",
+          "UINT256_COL",
+          "FLOAT32_COL",
+          "FLOAT64_COL",
+          "DATE_COL",
+          "DATETIME_COL",
+          "DATETIME64_COL",
+          "ENUM_COL",
+          "ENUM8_COL",
+          "ENUM16_COL",
+          "DECIMAL_COL",
+          "TUPLE_COL",
+          "MAP_COL"
         ]
       },
       "is_view": false,
-      "stream": "default-test_table",
+      "stream": "default-test_array_col",
       "metadata": [
         {
           "breadcrumb": [
             "properties",
-            "id"
+            "INT_COL"
+          ],
+          "metadata": {
+            "inclusion": "automatic"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "FLOAT_COL"
           ],
           "metadata": {
             "inclusion": "available"
@@ -48,7 +230,7 @@
         {
           "breadcrumb": [
             "properties",
-            "updated_at"
+            "BOOLEAN_COL"
           ],
           "metadata": {
             "inclusion": "available"
@@ -57,7 +239,241 @@
         {
           "breadcrumb": [
             "properties",
-            "name"
+            "ARRAY_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "NULLABLE_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "UUID_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "LOW_CARDINALITY_STRING_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "INT8_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "UINT8_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "INT16_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "UINT16_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "INT32_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "UINT32_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "INT64_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "UINT64_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "INT128_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "UINT128_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "INT256_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "UINT256_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "FLOAT32_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "FLOAT64_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "DATE_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "DATETIME_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "DATETIME64_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ENUM_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ENUM8_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ENUM16_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "DECIMAL_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "TUPLE_COL"
+          ],
+          "metadata": {
+            "inclusion": "available"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "MAP_COL"
           ],
           "metadata": {
             "inclusion": "available"
@@ -67,6 +483,9 @@
           "breadcrumb": [],
           "metadata": {
             "inclusion": "available",
+            "table-key-properties": [
+              "INT_COL"
+            ],
             "forced-replication-method": "",
             "schema-name": "default",
             "selected": true
