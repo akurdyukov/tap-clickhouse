@@ -5,6 +5,8 @@ import json
 import pytest
 import sqlalchemy
 from faker import Faker
+from singer_sdk.helpers._util import read_json_file
+from singer_sdk.singerlib import Catalog
 from singer_sdk.testing.templates import TapTestTemplate
 from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, text
 from singer_sdk.testing import get_tap_test_class, suites
@@ -84,7 +86,7 @@ custom_test_key_properties = suites.TestSuite(
 TapClickHouseTest = get_tap_test_class(
     tap_class=TapClickHouse,
     config=SAMPLE_CONFIG,
-    catalog="tests/resources/data.json",
+    catalog=Catalog.from_dict(read_json_file("tests/resources/data.json")),
     custom_suites=[custom_test_key_properties],
 )
 
