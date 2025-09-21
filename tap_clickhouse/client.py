@@ -5,12 +5,13 @@ This includes ClickHouseStream and ClickHouseConnector.
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from typing import Iterable
 from urllib.parse import quote
 
 import sqlalchemy  # noqa: TCH002
-from singer_sdk import SQLConnector, SQLStream
+from singer_sdk.sql import SQLConnector, SQLStream
 from sqlalchemy.engine import Engine, Inspector
+from singer_sdk.helpers.types import Context, Record
 
 
 class ClickHouseConnector(SQLConnector):
@@ -62,43 +63,50 @@ class ClickHouseConnector(SQLConnector):
 
         return schemas
 
-    @staticmethod
-    def to_sql_type(jsonschema_type: dict) -> sqlalchemy.types.TypeEngine:
-        """Returns a JSON Schema equivalent for the given SQL type.
-
-        Developers may optionally add custom logic before calling the default
-        implementation inherited from the base class.
-
-        Args:
-            jsonschema_type: A dict
-
-        Returns:
-            SQLAlchemy type
-        """
-        # Optionally, add custom logic before calling the parent SQLConnector method.
-        # You may delete this method if overrides are not needed.
-        return SQLConnector.to_sql_type(jsonschema_type)
-
 
 class ClickHouseStream(SQLStream):
     """Stream class for ClickHouse streams."""
 
     connector_class = ClickHouseConnector
 
-    def get_records(self, partition: dict | None) -> Iterable[dict[str, Any]]:
+    def get_records(self, context: Context | None) -> Iterable[Record]:
         """Return a generator of record-type dictionary objects.
 
-        Developers may optionally add custom logic before calling the default
-        implementation inherited from the base class.
+        If the stream has a replication_key value defined, records will be sorted by the
+        incremental key. If the stream also has an available starting bookmark, the
+        records will be filtered for values greater than or equal to the bookmark value.
 
         Args:
-            partition: If provided, will read specifically from this data slice.
+            context: If partition context is provided, will read specifically from this
+                data slice.
 
         Yields:
             One dict per record.
+
+        Raises:
+            NotImplementedError: If partition is passed in context and the stream does
+                not support partitioning.
         """
-        # Optionally, add custom logic instead of calling the super().
-        # This is helpful if the source database provides batch-optimized record
-        # retrieval.
-        # If no overrides or optimizations are needed, you may delete this method.
-        yield from super().get_records(partition)
+        if context:  # pragma: no cover
+            msg = f"Stream '{self.name}' does not support partitioning."
+            raise NotImplementedError(msg)
+
+        batch_size = self.config.get("batch_size", 10000)
+
+        query = self.build_query(context=context)
+        with self.connector._connect() as conn:  # noqa: SLF001
+            result = conn.execution_options(stream_results=True).execute(query)
+
+            # Use mappings() to get dictionary-like RowMapping objects
+            mapped_result = result.mappings()
+
+            while True:
+                # Fetch batch of RowMapping objects
+                batch = mapped_result.fetchmany(batch_size)
+                if not batch:
+                    break
+
+                for row in batch:
+                    # row is already a RowMapping (dict-like object)
+                    # Convert to regular dict for consistency
+                    yield dict(row)

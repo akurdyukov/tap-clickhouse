@@ -35,21 +35,22 @@ pipx install git+https://github.com/akurdyukov/tap-clickhouse.git@main
 
 ### Accepted Config Options
 
-| Setting              | Required |  Default  | Description                                                                                                                                 |
-|:---------------------|:--------:|:---------:|:--------------------------------------------------------------------------------------------------------------------------------------------|
-| driver               |  False   |   http    | Driver type                                                                                                                                 |
-| username             |  False   |  default  | Database user                                                                                                                               |
-| password             |   True   |   None    | Username password                                                                                                                           |
-| host                 |  False   | localhost | Database host                                                                                                                               |
-| port                 |  False   |   8123    | Database connection port                                                                                                                    |
-| database             |  False   |  default  | Database name                                                                                                                               |
-| secure               |  False   |     0     | Should the connection be secure                                                                                                             |
-| verify               |  False   |     1     | Should secure connection need to verify SSL/TLS                                                                                             |
-| stream_maps          |  False   |   None    | Config object for stream maps capability. For more information check out [Stream Maps](https://sdk.meltano.com/en/latest/stream_maps.html). |
-| stream_map_config    |  False   |   None    | User-defined config values to be used within map expressions.                                                                               |
-| flattening_enabled   |  False   |   None    | 'True' to enable schema flattening and automatically expand nested properties.                                                              |
-| flattening_max_depth |  False   |   None    | The max depth to flatten schemas.                                                                                                           |
-| batch_config         |  False   |   None    |                                                                                                                                             |
+| Setting               | Required |  Default  | Description                                                                                                                                   |
+|:----------------------|:--------:|:---------:|:----------------------------------------------------------------------------------------------------------------------------------------------|
+| driver                |  False   |   http    | Driver type                                                                                                                                   |
+| username              |  False   |  default  | Database user                                                                                                                                 |
+| password              |   True   |   None    | Username password                                                                                                                             |
+| host                  |  False   | localhost | Database host                                                                                                                                 |
+| port                  |  False   |   8123    | Database connection port                                                                                                                      |
+| database              |  False   |  default  | Database name                                                                                                                                 |
+| secure                |  False   |     0     | Should the connection be secure                                                                                                               |
+| verify                |  False   |     1     | Should secure connection need to verify SSL/TLS                                                                                               |
+| batch_size            |  False   |   10000   | Number of records to read in each batch when syncing data from ClickHouse.                                                                    |
+| stream_maps           |  False   |   None    | Config object for stream maps capability. For more information check out [Stream Maps](https://sdk.meltano.com/en/latest/stream_maps.html).   |
+| stream_map_config     |  False   |   None    | User-defined config values to be used within map expressions.                                                                                 |
+| flattening_enabled    |  False   |   None    | 'True' to enable schema flattening and automatically expand nested properties.                                                                |
+| flattening_max_depth  |  False   |   None    | The max depth to flatten schemas.                                                                                                             |
+| batch_config          |  False   |   None    |                                                                                                                                               |
 
 A full list of supported settings and capabilities for this
 tap is available by running:

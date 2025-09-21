@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from singer_sdk import SQLTap
+from singer_sdk.sql import SQLTap
 from singer_sdk import typing as th  # JSON schema typing helpers
 
 from tap_clickhouse.client import ClickHouseStream
@@ -71,6 +71,13 @@ class TapClickHouse(SQLTap):
             description="Should secure connection need to verify SSL/TLS",
             default=True
         ),
+        th.Property(
+            "batch_size",
+            th.IntegerType,
+            description="Rows to fetch per batch",
+            default=10000,
+            minimum=1000,
+        )
     ).to_dict()
 
 

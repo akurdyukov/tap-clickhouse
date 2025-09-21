@@ -77,7 +77,7 @@ class TapTestKeyProperties(TapTestTemplate):
         key_properties_test()
 
 
-custom_test_key_properties = suites.TestSuite(
+custom_test_key_properties = suites.SingerTestSuite(
     kind="tap",
     tests=[TapTestKeyProperties]
 )
