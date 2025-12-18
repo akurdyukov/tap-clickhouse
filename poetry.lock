@@ -57,18 +57,6 @@ tests = ["cloudpickle ; platform_python_implementation == \"CPython\"", "hypothe
 tests-mypy = ["mypy (>=1.11.1) ; platform_python_implementation == \"CPython\" and python_version >= \"3.10\"", "pytest-mypy-plugins ; platform_python_implementation == \"CPython\" and python_version >= \"3.10\""]
 
 [[package]]
-name = "backoff"
-version = "2.2.1"
-description = "Function decoration for backoff and retry"
-optional = false
-python-versions = ">=3.7,<4.0"
-groups = ["main", "dev"]
-files = [
-    {file = "backoff-2.2.1-py3-none-any.whl", hash = "sha256:63579f9a0628e06278f7e47b7d7d5b6ce20dc65c5e96a6f3ca99a6adca0396e8"},
-    {file = "backoff-2.2.1.tar.gz", hash = "sha256:03f829f5bb1923180821643f8753b0502c3b682293992485b0eef2807afa5cba"},
-]
-
-[[package]]
 name = "backports-datetime-fromisoformat"
 version = "2.0.3"
 description = "Backport of Python 3.11's datetime.fromisoformat"
@@ -980,6 +968,18 @@ tomli = {version = ">=1", markers = "python_version < \"3.11\""}
 dev = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "requests", "setuptools", "xmlschema"]
 
 [[package]]
+name = "python-backoff"
+version = "2.3.0"
+description = "Function decoration for backoff and retry"
+optional = false
+python-versions = ">=3.8"
+groups = ["main", "dev"]
+files = [
+    {file = "python_backoff-2.3.0-py3-none-any.whl", hash = "sha256:0d9eb5c63a470e6031ab2abb9cc974cf1846fc2c6c1b749b1f9ff5634d013b88"},
+    {file = "python_backoff-2.3.0.tar.gz", hash = "sha256:84f251492fc76ad615faaf8d4826dcb563bf98df53aad8ac887379857264b74a"},
+]
+
+[[package]]
 name = "python-dateutil"
 version = "2.9.0.post0"
 description = "Extensions to the standard Python datetime module"
@@ -1423,18 +1423,17 @@ files = [
 
 [[package]]
 name = "singer-sdk"
-version = "0.49.1"
+version = "0.53.4"
 description = "A framework for building Singer taps and targets"
 optional = false
 python-versions = ">=3.10"
 groups = ["main", "dev"]
 files = [
-    {file = "singer_sdk-0.49.1-py3-none-any.whl", hash = "sha256:fdcf74ba8f27f039363334eafeb7d7ecf9e7c67014ab5fcfe8210fe195fe8f7f"},
-    {file = "singer_sdk-0.49.1.tar.gz", hash = "sha256:8839ef96e169c83b1c2c63bcc45156e65cd69e6f9dc944f07767fd385f69777d"},
+    {file = "singer_sdk-0.53.4-py3-none-any.whl", hash = "sha256:0d3899eba6109dc4c2178248cfe6d0626b9743899f02a3107490e97ead3dd66b"},
+    {file = "singer_sdk-0.53.4.tar.gz", hash = "sha256:b380cffb7b32edcc25a22c920726845ebfc53220782cf475369bd10b67ff7e81"},
 ]
 
 [package.dependencies]
-backoff = ">=2.0.0,<4"
 backports-datetime-fromisoformat = {version = ">=2.0.1", markers = "python_version < \"3.11\""}
 click = ">=8.2,<9"
 fsspec = ">=2024.9.0"
@@ -1444,7 +1443,8 @@ joblib = ">=1.3.0"
 jsonpath-ng = ">=1.5.3"
 jsonschema = ">=4.16.0"
 packaging = ">=23.1"
-pytest = {version = ">=7.5", optional = true, markers = "extra == \"testing\""}
+pytest = {version = ">=9", optional = true, markers = "extra == \"testing\""}
+python-backoff = ">=2.2.2"
 python-dotenv = ">=0.20"
 pyyaml = ">=6.0"
 referencing = ">=0.30.0"
@@ -1463,7 +1463,7 @@ parquet = ["pyarrow (>=15)"]
 s3 = ["s3fs (>=2024.9.0)"]
 sql = ["sqlalchemy (>=2)"]
 ssh = ["paramiko (>=3.3.0)"]
-testing = ["pytest (>=7.5)"]
+testing = ["pytest (>=9)"]
 
 [[package]]
 name = "six"
@@ -1754,4 +1754,4 @@ s3 = ["fs-s3fs"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10.0,<4"
-content-hash = "ff00ec9e83749e4767c61f3d347678c7f003f8ee6b833770c733bc94ada03563"
+content-hash = "8be34d92e5c5068b9aab67d86142e15947635d24588bbc746177a90b711163a7"
