@@ -160,26 +160,31 @@ class ClickHouseStream(SQLStream):
         return query
 
     def _normalize_datetime64_precision(self, query):
-        """Cast DateTime64 columns above microseconds to DateTime64(6)."""
+        """Cast DateTime64 to scale 6 for HTTP TSV parsing (%f allows 6 digits max)."""
         selected_columns = list(query.selected_columns)
         normalized_columns = []
         updated = False
 
         for selected_column in selected_columns:
             type_name = str(selected_column.type).lower()
-            match = DATETIME64_PRECISION_PATTERN.search(type_name)
-            if match and int(match.group(1)) > 6:
-                label_name = selected_column.key or selected_column.name
-                normalized_columns.append(
-                    sqlalchemy.func.toDateTime64(
-                        selected_column,
-                        sqlalchemy.literal_column("6"),
-                    ).label(label_name)
-                )
-                updated = True
+            if "datetime64" not in type_name:
+                normalized_columns.append(selected_column)
                 continue
 
-            normalized_columns.append(selected_column)
+            match = DATETIME64_PRECISION_PATTERN.search(type_name)
+            precision = int(match.group(1)) if match else None
+            if precision is not None and precision <= 6:
+                normalized_columns.append(selected_column)
+                continue
+
+            label_name = selected_column.key or selected_column.name
+            normalized_columns.append(
+                sqlalchemy.func.toDateTime64(
+                    selected_column,
+                    sqlalchemy.literal_column("6"),
+                ).label(label_name)
+            )
+            updated = True
 
         if not updated:
             return query

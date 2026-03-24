@@ -17,6 +17,11 @@ class _DateTime64Six(sa.types.TypeEngine):
         return "DateTime64(6)"
 
 
+class _DateTime64Bare(sa.types.TypeEngine):
+    def __str__(self) -> str:
+        return "DateTime64"
+
+
 def test_ordered_query_normalizes_high_precision_datetime64():
     stream = object.__new__(ClickHouseStream)
     column = sa.column("_peerdb_synced_at", _DateTime64Nine())
@@ -55,6 +60,16 @@ def test_datetime64_precision_six_is_not_normalized():
     normalized_query = stream._normalize_datetime64_precision(query)
 
     assert "toDateTime64" not in str(normalized_query)
+
+
+def test_datetime64_without_precision_list_is_normalized():
+    stream = object.__new__(ClickHouseStream)
+    column = sa.column("ts", _DateTime64Bare())
+    query = sa.select(column)
+
+    normalized_query = stream._normalize_datetime64_precision(query)
+
+    assert "toDateTime64" in str(normalized_query)
 
 
 def test_incremental_datetime_bookmark_uses_datetime64_parser():
