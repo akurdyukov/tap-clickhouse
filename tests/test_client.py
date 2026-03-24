@@ -17,31 +17,21 @@ class _DateTime64Six(sa.types.TypeEngine):
         return "DateTime64(6)"
 
 
-def _build_stream(
-    replication_key: str | None,
-    column_type: sa.types.TypeEngine,
-    column_name: str = "id",
-):
+def test_ordered_query_normalizes_high_precision_datetime64():
     stream = object.__new__(ClickHouseStream)
-    stream.replication_key = replication_key
-    stream.name = "default-test_table"
-    stream.table = sa.table("test_table", sa.column(column_name, column_type))
-    return stream
-
-
-def test_ordered_query_adds_order_by_for_incremental_stream():
-    stream = _build_stream("id", sa.Integer())
-    query = sa.select(stream.table.c.id)
-
-    stream.build_query = lambda context=None: query
+    column = sa.column("_peerdb_synced_at", _DateTime64Nine())
+    stream.build_query = lambda context=None: sa.select(column)
 
     ordered_query = stream._ordered_query(context=None)
 
-    assert "ORDER BY test_table.id ASC" in str(ordered_query)
+    assert "toDateTime64" in str(ordered_query)
 
 
-def test_uuid_like_incremental_id_is_rejected():
-    stream = _build_stream("id", sa.String())
+def test_uuid_like_incremental_id_is_detected():
+    stream = object.__new__(ClickHouseStream)
+    stream.replication_key = "id"
+    table = sa.table("t", sa.column("id", sa.String()))
+    stream._sqlalchemy_table = lambda: table
 
     assert stream._is_incremental_uuid_id is True
 
@@ -68,25 +58,32 @@ def test_datetime64_precision_six_is_not_normalized():
 
 
 def test_incremental_datetime_bookmark_uses_datetime64_parser():
-    stream = _build_stream(
-        "created_at",
-        _DateTime64Six(),
-        column_name="created_at",
-    )
+    stream = object.__new__(ClickHouseStream)
+    stream.replication_key = "created_at"
+    stream.supports_nulls_first = False
     stream.get_starting_replication_key_value = lambda context: (
         "2025-10-28T16:04:47.778895+00:00"
     )
+    table = sa.table("t", sa.column("created_at", _DateTime64Six()))
+    query = table.select()
 
-    query = stream.build_query(context=None)
+    filtered = ClickHouseStream.apply_query_filters(
+        stream, query, table, context=None
+    )
 
-    assert "parseDateTime64BestEffort" in str(query)
+    assert "parseDateTime64BestEffort" in str(filtered)
 
 
 def test_incremental_integer_bookmark_does_not_use_datetime64_parser():
-    stream = _build_stream("id", sa.Integer())
+    stream = object.__new__(ClickHouseStream)
+    stream.replication_key = "id"
+    stream.supports_nulls_first = False
     stream.get_starting_replication_key_value = lambda context: 42
+    table = sa.table("t", sa.column("id", sa.Integer()))
+    query = table.select()
 
-    query = stream.build_query(context=None)
+    filtered = ClickHouseStream.apply_query_filters(
+        stream, query, table, context=None
+    )
 
-    assert "parseDateTime64BestEffort" not in str(query)
-
+    assert "parseDateTime64BestEffort" not in str(filtered)

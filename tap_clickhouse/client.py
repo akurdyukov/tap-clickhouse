@@ -16,6 +16,8 @@ import requests  # noqa: TCH002
 from singer_sdk.helpers.types import Context, Record
 from singer_sdk.sql import SQLConnector, SQLStream
 from sqlalchemy.engine import Engine, Inspector
+from sqlalchemy.sql.selectable import Select
+from sqlalchemy import Table
 from urllib3.exceptions import ProtocolError
 
 LOGGER = logging.getLogger(__name__)
@@ -97,13 +99,21 @@ class ClickHouseStream(SQLStream):
 
     connector_class = ClickHouseConnector
 
+    def _sqlalchemy_table(self) -> Table:
+        """Return the reflected table for the stream's selected catalog properties."""
+        selected_column_names = self.get_selected_schema()["properties"].keys()
+        return self.connector.get_table(
+            full_table_name=self.fully_qualified_name,
+            column_names=selected_column_names,
+        )
+
     @property
     def _is_incremental_uuid_id(self) -> bool:
         """Return true when incremental sync uses uuid-like id values."""
         if self.replication_key != "id":
             return False
 
-        table_column = self.table.columns.get(self.replication_key)
+        table_column = self._sqlalchemy_table().columns.get(self.replication_key)
         if table_column is None:
             return False
 
@@ -121,34 +131,33 @@ class ClickHouseStream(SQLStream):
         return isinstance(table_column.type, string_types)
 
     def _ordered_query(self, context: Context | None):
-        """Build query and enforce deterministic incremental ordering."""
+        """Build query and normalize DateTime64 column precision for the driver."""
         query = self.build_query(context=context)
-        query = self._normalize_datetime64_precision(query)
-        if not self.replication_key:
-            return query
+        return self._normalize_datetime64_precision(query)
 
-        table_column = self.table.columns.get(self.replication_key)
-        if table_column is None:
-            return query
+    def apply_query_filters(
+        self,
+        query: Select,
+        table: Table,
+        *,
+        context: Context | None = None,
+    ) -> Select:
+        """Apply replication filters with ClickHouse-safe datetime bookmark values."""
+        if self.replication_key:
+            column = table.columns[self.replication_key]
+            order_by = (
+                sqlalchemy.nulls_first(column.asc())
+                if self.supports_nulls_first
+                else column.asc()
+            )
+            query = query.order_by(order_by)
 
-        return query.order_by(table_column.asc())
+            start_val = self.get_starting_replication_key_value(context)
+            if start_val is not None:
+                filter_value = self._coerce_replication_value(column, start_val)
+                query = query.where(column >= filter_value)
 
-    def build_query(self, context: Context | None = None):
-        """Build query with ClickHouse-safe incremental datetime filtering."""
-        query = sqlalchemy.select(*self.table.columns).select_from(self.table)
-        if not self.replication_key:
-            return query
-
-        table_column = self.table.columns.get(self.replication_key)
-        if table_column is None:
-            return query
-
-        start_value = self.get_starting_replication_key_value(context)
-        if start_value is None:
-            return query
-
-        filter_value = self._coerce_replication_value(table_column, start_value)
-        return query.where(table_column >= filter_value)
+        return query
 
     def _normalize_datetime64_precision(self, query):
         """Cast DateTime64 columns above microseconds to DateTime64(6)."""
