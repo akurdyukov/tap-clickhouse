@@ -225,7 +225,7 @@ class ClickHouseStream(SQLStream):
             )
             raise ValueError(msg)
 
-        batch_size = self.config.get("batch_size", 5000)
+        batch_size = self.config.get("batch_size", 10000)
         max_attempts = int(self.config.get("stream_retry_max_attempts", 3))
         retry_wait = float(self.config.get("stream_retry_wait_seconds", 2.0))
         transient_errors = _transient_http_read_errors()
