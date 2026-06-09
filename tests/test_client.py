@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
-import sqlalchemy as sa
+import enum
 
-from tap_clickhouse.client import ClickHouseStream
+import sqlalchemy as sa
+from singer_sdk import typing as th
+
+from tap_clickhouse.client import (
+    ClickHouseSQLToJSONSchema,
+    ClickHouseStream,
+    _is_enum_column_type,
+    _normalize_enum_value,
+)
 
 
 class _DateTime64Nine(sa.types.TypeEngine):
@@ -102,3 +110,60 @@ def test_incremental_integer_bookmark_does_not_use_datetime64_parser():
     )
 
     assert "parseDateTime64BestEffort" not in str(filtered)
+
+
+class _EnumType(sa.types.Enum):
+    def __init__(self) -> None:
+        enum_class = enum.Enum("payment_type_enum", {"CSH": 1, "CRD": 2})
+        super().__init__(enum_class)
+
+
+def test_normalize_enum_value_from_python_enum():
+    enum_class = enum.Enum("payment_type_enum", {"CSH": 1, "CRD": 2})
+    assert _normalize_enum_value(enum_class.CSH) == "CSH"
+
+
+def test_normalize_enum_value_from_prefixed_string():
+    assert _normalize_enum_value("payment_type_enum.CSH") == "CSH"
+
+
+def test_normalize_enum_value_passthrough():
+    assert _normalize_enum_value("CSH") == "CSH"
+    assert _normalize_enum_value(42) == 42
+
+
+def test_is_enum_column_type_detects_sqlalchemy_enum():
+    assert _is_enum_column_type(_EnumType()) is True
+
+
+def test_is_enum_column_type_rejects_non_enum():
+    assert _is_enum_column_type(sa.String()) is False
+
+
+def test_ordered_query_casts_enum_columns_to_string():
+    stream = object.__new__(ClickHouseStream)
+    column = sa.column("payment_type", _EnumType())
+    stream.build_query = lambda context=None: sa.select(column)
+
+    ordered_query = stream._ordered_query(context=None)
+
+    assert "toString" in str(ordered_query)
+
+
+def test_normalize_record_converts_enum_fields():
+    stream = object.__new__(ClickHouseStream)
+    enum_class = enum.Enum("payment_type_enum", {"CSH": 1})
+    record = {"payment_type": enum_class.CSH, "id": 1}
+
+    normalized = stream._normalize_record(record)
+
+    assert normalized == {"payment_type": "CSH", "id": 1}
+
+
+def test_enum_to_jsonschema_sets_max_length():
+    converter = ClickHouseSQLToJSONSchema()
+    enum_type = _EnumType()
+
+    schema = converter.to_jsonschema(enum_type)
+
+    assert schema == th.StringType(max_length=3).type_dict

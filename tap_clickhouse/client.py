@@ -5,6 +5,7 @@ This includes ClickHouseStream and ClickHouseConnector.
 
 from __future__ import annotations
 
+import enum
 import logging
 import re
 import time
@@ -13,7 +14,9 @@ from urllib.parse import quote
 
 import sqlalchemy  # noqa: TCH002
 import requests  # noqa: TCH002
+from singer_sdk import typing as th
 from singer_sdk.helpers.types import Context, Record
+from singer_sdk.sql.connector import SQLToJSONSchema
 from singer_sdk.sql import SQLConnector, SQLStream
 from sqlalchemy.engine import Engine, Inspector
 from sqlalchemy.sql.selectable import Select
@@ -22,6 +25,63 @@ from urllib3.exceptions import ProtocolError
 
 LOGGER = logging.getLogger(__name__)
 DATETIME64_PRECISION_PATTERN = re.compile(r"datetime64\((\d+)\)")
+ENUM_VALUE_PREFIX_PATTERN = re.compile(r"^.+_enum\.(.+)$")
+
+
+def _unwrap_clickhouse_type(
+    column_type: sqlalchemy.types.TypeEngine,
+) -> sqlalchemy.types.TypeEngine:
+    """Return the innermost type for Nullable/LowCardinality wrappers."""
+    while True:
+        nested_type = getattr(column_type, "nested_type", None)
+        if nested_type is None:
+            return column_type
+        column_type = nested_type
+
+
+def _is_enum_column_type(column_type: sqlalchemy.types.TypeEngine) -> bool:
+    """Return true when the column type is a ClickHouse Enum."""
+    unwrapped = _unwrap_clickhouse_type(column_type)
+    if isinstance(unwrapped, sqlalchemy.types.Enum):
+        return True
+
+    return str(unwrapped).lower().startswith("enum")
+
+
+def _enum_max_length(column_type: sqlalchemy.types.Enum) -> int | None:
+    """Return the longest enum label length for JSON Schema maxLength."""
+    if column_type.enum_class is not None:
+        return max(len(member.name) for member in column_type.enum_class)
+
+    if column_type.enums:
+        return max(len(str(value)) for value in column_type.enums)
+
+    return None
+
+
+def _normalize_enum_value(value: object) -> object:
+    """Convert reflected ClickHouse enum values to plain string labels."""
+    if isinstance(value, enum.Enum):
+        return value.name
+
+    if isinstance(value, str):
+        match = ENUM_VALUE_PREFIX_PATTERN.match(value)
+        if match:
+            return match.group(1)
+
+    return value
+
+
+class ClickHouseSQLToJSONSchema(SQLToJSONSchema):
+    """Map ClickHouse SQLAlchemy types to JSON Schema."""
+
+    @SQLToJSONSchema.to_jsonschema.register
+    def enum_to_jsonschema(self, column_type: sqlalchemy.types.Enum) -> dict:
+        """Return a JSON Schema representation of an Enum type."""
+        max_length = _enum_max_length(column_type)
+        if max_length is not None:
+            return th.StringType(max_length=max_length).type_dict  # type: ignore[no-any-return]
+        return th.StringType.type_dict  # type: ignore[no-any-return]
 
 
 class _StreamRetryFromScratch(Exception):
@@ -40,6 +100,8 @@ def _transient_http_read_errors() -> tuple[type[Exception], ...]:
 
 class ClickHouseConnector(SQLConnector):
     """Connects to the ClickHouse SQL source."""
+
+    sql_to_jsonschema_converter = ClickHouseSQLToJSONSchema
 
     def get_sqlalchemy_url(self, config: dict) -> str:
         """Concatenate a SQLAlchemy URL for use in connecting to the source.
@@ -131,9 +193,39 @@ class ClickHouseStream(SQLStream):
         return isinstance(table_column.type, string_types)
 
     def _ordered_query(self, context: Context | None):
-        """Build query and normalize DateTime64 column precision for the driver."""
+        """Build query and normalize ClickHouse-specific column types for the driver."""
         query = self.build_query(context=context)
-        return self._normalize_datetime64_precision(query)
+        query = self._normalize_datetime64_precision(query)
+        return self._normalize_enum_columns(query)
+
+    def _normalize_enum_columns(self, query: Select) -> Select:
+        """Cast Enum columns to String so values match ClickHouse text output."""
+        selected_columns = list(query.selected_columns)
+        normalized_columns = []
+        updated = False
+
+        for selected_column in selected_columns:
+            if not _is_enum_column_type(selected_column.type):
+                normalized_columns.append(selected_column)
+                continue
+
+            label_name = selected_column.key or selected_column.name
+            normalized_columns.append(
+                sqlalchemy.func.toString(selected_column).label(label_name)
+            )
+            updated = True
+
+        if not updated:
+            return query
+
+        return query.with_only_columns(*normalized_columns)
+
+    def _normalize_record(self, record: Record) -> Record:
+        """Normalize enum values in a record before Singer serialization."""
+        return {
+            key: _normalize_enum_value(value)
+            for key, value in record.items()
+        }
 
     def apply_query_filters(
         self,
@@ -307,7 +399,7 @@ class ClickHouseStream(SQLStream):
 
                         for row in batch:
                             rows_yielded_total += 1
-                            yield dict(row)
+                            yield self._normalize_record(dict(row))
 
             except _StreamRetryFromScratch:
                 if attempt >= max_attempts:
