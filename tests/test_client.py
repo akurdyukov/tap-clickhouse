@@ -1,0 +1,169 @@
+"""Tests for ClickHouse stream behavior."""
+
+from __future__ import annotations
+
+import enum
+
+import sqlalchemy as sa
+from singer_sdk import typing as th
+
+from tap_clickhouse.client import (
+    ClickHouseSQLToJSONSchema,
+    ClickHouseStream,
+    _is_enum_column_type,
+    _normalize_enum_value,
+)
+
+
+class _DateTime64Nine(sa.types.TypeEngine):
+    def __str__(self) -> str:
+        return "DateTime64(9)"
+
+
+class _DateTime64Six(sa.types.TypeEngine):
+    def __str__(self) -> str:
+        return "DateTime64(6)"
+
+
+class _DateTime64Bare(sa.types.TypeEngine):
+    def __str__(self) -> str:
+        return "DateTime64"
+
+
+def test_ordered_query_normalizes_high_precision_datetime64():
+    stream = object.__new__(ClickHouseStream)
+    column = sa.column("_peerdb_synced_at", _DateTime64Nine())
+    stream.build_query = lambda context=None: sa.select(column)
+
+    ordered_query = stream._ordered_query(context=None)
+
+    assert "toDateTime64" in str(ordered_query)
+
+
+def test_uuid_like_incremental_id_is_detected():
+    stream = object.__new__(ClickHouseStream)
+    stream.replication_key = "id"
+    table = sa.table("t", sa.column("id", sa.String()))
+    stream._sqlalchemy_table = lambda: table
+
+    assert stream._is_incremental_uuid_id is True
+
+
+def test_datetime64_precision_greater_than_six_is_normalized():
+    stream = object.__new__(ClickHouseStream)
+    column = sa.column("_peerdb_synced_at", _DateTime64Nine())
+    query = sa.select(column)
+
+    normalized_query = stream._normalize_datetime64_precision(query)
+
+    assert "toDateTime64" in str(normalized_query)
+    assert "AS _peerdb_synced_at" in str(normalized_query)
+
+
+def test_datetime64_precision_six_is_not_normalized():
+    stream = object.__new__(ClickHouseStream)
+    column = sa.column("created_at", _DateTime64Six())
+    query = sa.select(column)
+
+    normalized_query = stream._normalize_datetime64_precision(query)
+
+    assert "toDateTime64" not in str(normalized_query)
+
+
+def test_datetime64_without_precision_list_is_normalized():
+    stream = object.__new__(ClickHouseStream)
+    column = sa.column("ts", _DateTime64Bare())
+    query = sa.select(column)
+
+    normalized_query = stream._normalize_datetime64_precision(query)
+
+    assert "toDateTime64" in str(normalized_query)
+
+
+def test_incremental_datetime_bookmark_uses_datetime64_parser():
+    stream = object.__new__(ClickHouseStream)
+    stream.replication_key = "created_at"
+    stream.supports_nulls_first = False
+    stream.get_starting_replication_key_value = lambda context: (
+        "2025-10-28T16:04:47.778895+00:00"
+    )
+    table = sa.table("t", sa.column("created_at", _DateTime64Six()))
+    query = table.select()
+
+    filtered = ClickHouseStream.apply_query_filters(
+        stream, query, table, context=None
+    )
+
+    assert "parseDateTime64BestEffort" in str(filtered)
+
+
+def test_incremental_integer_bookmark_does_not_use_datetime64_parser():
+    stream = object.__new__(ClickHouseStream)
+    stream.replication_key = "id"
+    stream.supports_nulls_first = False
+    stream.get_starting_replication_key_value = lambda context: 42
+    table = sa.table("t", sa.column("id", sa.Integer()))
+    query = table.select()
+
+    filtered = ClickHouseStream.apply_query_filters(
+        stream, query, table, context=None
+    )
+
+    assert "parseDateTime64BestEffort" not in str(filtered)
+
+
+class _EnumType(sa.types.Enum):
+    def __init__(self) -> None:
+        enum_class = enum.Enum("payment_type_enum", {"CSH": 1, "CRD": 2})
+        super().__init__(enum_class)
+
+
+def test_normalize_enum_value_from_python_enum():
+    enum_class = enum.Enum("payment_type_enum", {"CSH": 1, "CRD": 2})
+    assert _normalize_enum_value(enum_class.CSH) == "CSH"
+
+
+def test_normalize_enum_value_from_prefixed_string():
+    assert _normalize_enum_value("payment_type_enum.CSH") == "CSH"
+
+
+def test_normalize_enum_value_passthrough():
+    assert _normalize_enum_value("CSH") == "CSH"
+    assert _normalize_enum_value(42) == 42
+
+
+def test_is_enum_column_type_detects_sqlalchemy_enum():
+    assert _is_enum_column_type(_EnumType()) is True
+
+
+def test_is_enum_column_type_rejects_non_enum():
+    assert _is_enum_column_type(sa.String()) is False
+
+
+def test_ordered_query_casts_enum_columns_to_string():
+    stream = object.__new__(ClickHouseStream)
+    column = sa.column("payment_type", _EnumType())
+    stream.build_query = lambda context=None: sa.select(column)
+
+    ordered_query = stream._ordered_query(context=None)
+
+    assert "toString" in str(ordered_query)
+
+
+def test_normalize_record_converts_enum_fields():
+    stream = object.__new__(ClickHouseStream)
+    enum_class = enum.Enum("payment_type_enum", {"CSH": 1})
+    record = {"payment_type": enum_class.CSH, "id": 1}
+
+    normalized = stream._normalize_record(record)
+
+    assert normalized == {"payment_type": "CSH", "id": 1}
+
+
+def test_enum_to_jsonschema_sets_max_length():
+    converter = ClickHouseSQLToJSONSchema()
+    enum_type = _EnumType()
+
+    schema = converter.to_jsonschema(enum_type)
+
+    assert schema == th.StringType(max_length=3).type_dict

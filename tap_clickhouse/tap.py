@@ -20,7 +20,10 @@ class TapClickHouse(SQLTap):
             "driver",
             th.StringType,
             required=False,
-            description="Driver type",
+            description=(
+                "Driver type. Use native for long or large extracts; "
+                "HTTP can hit chunked transfer timeouts."
+            ),
             default="http",
             allowed_values=["http", "native", "asynch"]
         ),
@@ -77,7 +80,34 @@ class TapClickHouse(SQLTap):
             description="Rows to fetch per batch",
             default=10000,
             minimum=1000,
-        )
+        ),
+        th.Property(
+            "http_timeout_seconds",
+            th.IntegerType,
+            required=False,
+            description=(
+                "HTTP driver only: requests connect/read timeout in seconds."
+            ),
+        ),
+        th.Property(
+            "stream_retry_max_attempts",
+            th.IntegerType,
+            required=False,
+            description=(
+                "HTTP driver: max full-query retries after transient read errors "
+                "before any rows are emitted."
+            ),
+            default=3,
+        ),
+        th.Property(
+            "stream_retry_wait_seconds",
+            th.IntegerType,
+            required=False,
+            description=(
+                "Seconds to wait between stream retry attempts."
+            ),
+            default=2,
+        ),
     ).to_dict()
 
 
